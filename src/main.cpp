@@ -8,6 +8,7 @@ float currentTemp = 0.0;
 float currentHumidity = 0.0;
 char wifiSSID[] = "YoungGuest";
 char wifiPassword[] = "aDayattherange69!";
+char mqttServer[] = "10.1.0.10";
 
 void startSerial (int baudRate) {
   Serial.begin(baudRate);
@@ -22,6 +23,8 @@ void startWiFi(char wifiSSID[], char wifiPassword[]) {
   Serial.println(WiFi.status());
   Serial.print("Connected to WiFi network: ");
   Serial.println(WiFi.SSID());
+  Serial.print("IPv4: ");
+  Serial.println(WiFi.localIP());
 }
 void checkDHT(int dhtPin) {
   dht.setup(dhtPin);
