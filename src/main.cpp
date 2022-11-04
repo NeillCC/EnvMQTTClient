@@ -1,15 +1,25 @@
 #include "DHT.h"
 #include "WiFi.h"
 
+#pragma region DHT Variables
 DHT dht;
-int dhtPin = 4;
-int sleepSeconds = 5;
+int dhtPin = 14;
 float currentTemp = 0.0;
 float currentHumidity = 0.0;
+#pragma endregion
+#pragma region WiFi Settings
 char wifiSSID[] = "YoungGuest";
 char wifiPassword[] = "aDayattherange69!";
+int sleepSeconds = 5;
+#pragma endregion
+#pragma region MQTT Variables
 char mqttServer[] = "10.1.0.10";
-
+int  mqttPort = 1883;
+char mqttPayload[] = "";
+char mqttUsername[] = "";
+char mqttPassword[] = "";
+#pragma endregion
+#pragma region 
 void startSerial (int baudRate) {
   Serial.begin(baudRate);
   Serial.println("");
@@ -36,6 +46,9 @@ void checkDHT(int dhtPin) {
   Serial.println(currentTemp);
   Serial.print("Current Humidity: ");
   Serial.println(currentHumidity);
+}
+void startMQTTClient() {
+  int i = 0;
 }
 void startSleep(int sleepSeconds) {
   int sleepMilliseconds = sleepSeconds * 1000000;
