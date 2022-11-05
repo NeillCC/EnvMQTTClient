@@ -1,54 +1,132 @@
 #include "DHT.h"
 #include "WiFi.h"
+#include <PubSubClient.h>
 
-#pragma region DHT Variables
+
+#pragma region User Settings
+//WiFi
+char wifiSSID[] = "iot7"; //WiFi Name
+char wifiPassword[] = "aDayattherange69!"; //WiFi Password
+char wifiHostname[] = "tempProbe01"; //Name to give dhcp server. This just needs be unique to your MQTT broker
+//MQTT Settings
+char mqttServer[] = "10.0.1.11"; //DNS or IP for MQTT Broker
+int  mqttPort = 2883; //Port for MQTT Broker. 1883 is standard
+//Power Settings
+//TODO sleepSeconds can be overriden by declaring a cycleTime topic on your MQTT Broker
+int sleepSeconds = 5; //How often to boot and update MQTT Broker. Higher number means less frequent updates, but better battery life. Default 60
+#pragma endregion
+
+
+#pragma region declaration
 DHT dht;
-int dhtPin = 14;
-float currentTemp = 0.0;
+WiFiClient wifiClient;
+PubSubClient mqttClient;
+#pragma endregion
+#pragma region DHT Variables
+int dhtPin = 4;
+float currentTemperatureFarnehit = 0.0;
+float currentTemperatureCelsius = 0.0;
 float currentHumidity = 0.0;
+char currentTemperatureFarnehitString[5];
+char currentTemperatureCelsiusString[5];
+char currentHumidityString[5];
 #pragma endregion
-#pragma region WiFi Settings
-char wifiSSID[] = "YoungGuest";
-char wifiPassword[] = "aDayattherange69!";
-int sleepSeconds = 5;
-#pragma endregion
-#pragma region MQTT Variables
-char mqttServer[] = "10.1.0.10";
-int  mqttPort = 1883;
-char mqttPayload[] = "";
-char mqttUsername[] = "";
-char mqttPassword[] = "";
-#pragma endregion
-#pragma region 
 void startSerial (int baudRate) {
   Serial.begin(baudRate);
   Serial.println("");
   Serial.println("");
   Serial.println("Booting...");
 }
-void startWiFi(char wifiSSID[], char wifiPassword[]) {
+void startWiFi(char wifiSSID[], char wifiPassword[]) {  
+  Serial.println("Attempting WiFi connection...");
   WiFi.begin(wifiSSID, wifiPassword);
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {delay(1);}
+  Serial.println();
   Serial.print("Network Status: ");
   Serial.println(WiFi.status());
   Serial.print("Connected to WiFi network: ");
   Serial.println(WiFi.SSID());
   Serial.print("IPv4: ");
   Serial.println(WiFi.localIP());
+  Serial.print("Netmask: ");
+  Serial.println(WiFi.subnetMask());
+  Serial.print("Gateway: ");
+  Serial.println(WiFi.gatewayIP());
+  Serial.print("DNS: ");
+  Serial.println(WiFi.dnsIP());
+  Serial.print("Can resolve and reach google? [bool]: ");
+  Serial.println(wifiClient.connect("google.com", 80)); //Check local DNS for connectivity
+  wifiClient.stop();
+  Serial.println();
+
 }
 void checkDHT(int dhtPin) {
   dht.setup(dhtPin);
   delay(dht.getMinimumSamplingPeriod());
-  currentTemp = dht.toFahrenheit(dht.getTemperature());
+  currentTemperatureFarnehit = dht.toFahrenheit(dht.getTemperature());
   currentHumidity = dht.getHumidity();
   //Print temp results for debug
   Serial.print("Current Temperature: ");
-  Serial.println(currentTemp);
+  Serial.println(currentTemperatureFarnehit);
   Serial.print("Current Humidity: ");
   Serial.println(currentHumidity);
 }
-void startMQTTClient() {
+void startMQTT(WiFiClient wifiClient, PubSubClient mqttClient, char mqttUsername[] = NULL, char mqttPassword[] = NULL) {
+  //Supports MQTT auth by disabled by default
+  //wifiClient.connect(mqttServer, mqttPort);
+  mqttClient.setClient(wifiClient);
+  mqttClient.setServer(mqttServer, mqttPort);
+
+  //Try to connect 10 times
   int i = 0;
+  while (!mqttClient.connected() and i < 10) {
+    i++;
+    Serial.print("MQTT connection attempt to ");
+    Serial.print(mqttServer);
+    Serial.print(" number ");
+    Serial.println(i);
+    
+    // Attempt to connect
+    if (mqttClient.connect(wifiHostname, mqttUsername, mqttPassword)) {
+      Serial.print("MQTT connection to ");
+      Serial.print(mqttServer);
+      Serial.println(" succesful!");
+      //Build topic strings
+      std::string tempFTxt = "/Farenheit";
+      std::string tempCTxt = "/Celsius";
+      std::string humidTxt = "/Humidity";
+      std::string mqttName = wifiHostname;
+      int l1 = mqttName.length() + tempFTxt.length();
+      int l2 = mqttName.length() + tempCTxt.length();
+      int l3 = mqttName.length() + humidTxt.length();
+      char farenheitTopic[l1 + 1];
+      char celsiusTopic[l2 + 1];
+      char humidityTopic[l3 + 1];
+      std::string tempF = wifiHostname + tempFTxt;
+      std::string tempC = wifiHostname + tempCTxt;
+      std::string humid = wifiHostname + humidTxt;
+      strcpy(farenheitTopic, tempF.c_str());
+      strcpy(celsiusTopic, tempC.c_str());
+      strcpy(humidityTopic, humid.c_str());
+      //Build data strings
+      dtostrf(currentTemperatureFarnehit, 4, 2, currentTemperatureFarnehitString);
+      dtostrf(currentTemperatureCelsius, 4, 2, currentTemperatureCelsiusString);
+      dtostrf(currentHumidity, 4, 2, currentHumidityString);
+      //Publish data to MQTT Broker
+      mqttClient.publish(farenheitTopic, currentTemperatureFarnehitString);
+      mqttClient.publish(celsiusTopic, currentTemperatureCelsiusString);
+      mqttClient.publish(humidityTopic, currentHumidityString);
+      Serial.println("Published MQTT data"); 
+      //TODO override sleepSeconds with data from this subscription if data is returned
+      //mqttClient.subscribe("cycleTime");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 1 second...");
+      // Wait 5 seconds before retrying
+      delay(1000);
+    }
+  }
 }
 void startSleep(int sleepSeconds) {
   int sleepMilliseconds = sleepSeconds * 1000000;
@@ -69,6 +147,8 @@ void setup() {
   startWiFi(wifiSSID, wifiPassword);
   //Check DHT sensor for temperature and humidity
   checkDHT(dhtPin);
+  //Publish DHT data to MQTT broker
+  startMQTT(wifiClient, mqttClient);
   //Sleep to save power
   startSleep(sleepSeconds);    
 }
