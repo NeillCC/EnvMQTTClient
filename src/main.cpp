@@ -27,7 +27,7 @@ PubSubClient mqttClient;
 int dhtPin = 4;                             //DHT connection pin
 float currentTemperatureFarnehit;
 float currentTemperatureCelsius;
-float currentHumidity = 0.0;
+float currentHumidity;
 std::string currentTemperatureFarnehitString;
 std::string currentTemperatureCelsiusString;
 std::string currentHumidityString;
