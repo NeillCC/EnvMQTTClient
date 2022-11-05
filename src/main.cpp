@@ -24,12 +24,12 @@ PubSubClient mqttClient;
 #pragma endregion
 #pragma region DHT Variables
 int dhtPin = 4;
-float currentTemperatureFarnehit = 0.0;
-float currentTemperatureCelsius = 0.0;
+float currentTemperatureFarnehit;
+float currentTemperatureCelsius;
 float currentHumidity = 0.0;
-char currentTemperatureFarnehitString[5];
-char currentTemperatureCelsiusString[5];
-char currentHumidityString[5];
+std::string currentTemperatureFarnehitString;
+std::string currentTemperatureCelsiusString;
+std::string currentHumidityString;
 #pragma endregion
 void startSerial (int baudRate) {
   Serial.begin(baudRate);
@@ -63,11 +63,19 @@ void startWiFi(char wifiSSID[], char wifiPassword[]) {
 void checkDHT(int dhtPin) {
   dht.setup(dhtPin);
   delay(dht.getMinimumSamplingPeriod());
-  currentTemperatureFarnehit = dht.toFahrenheit(dht.getTemperature());
+  //Get readings
+  currentTemperatureCelsius = dht.getTemperature();
+  currentTemperatureFarnehit = dht.toFahrenheit(currentTemperatureCelsius);
   currentHumidity = dht.getHumidity();
+  //Make string versions
+  currentTemperatureFarnehitString = std::to_string(currentTemperatureFarnehit);
+  currentTemperatureCelsiusString = std::to_string(currentTemperatureCelsius);
+  currentHumidityString = std::to_string(currentHumidity);
   //Print temp results for debug
-  Serial.print("Current Temperature: ");
+  Serial.print("Current Temperature F: ");
   Serial.println(currentTemperatureFarnehit);
+  Serial.print("Current Temperature C: ");
+  Serial.println(currentTemperatureCelsius);
   Serial.print("Current Humidity: ");
   Serial.println(currentHumidity);
 }
@@ -91,7 +99,7 @@ void startMQTT(WiFiClient wifiClient, PubSubClient mqttClient, char mqttUsername
       Serial.print("MQTT connection to ");
       Serial.print(mqttServer);
       Serial.println(" succesful!");
-      //Build topic strings
+      //Build MQTT Topic char[]
       std::string tempFTxt = "/Farenheit";
       std::string tempCTxt = "/Celsius";
       std::string humidTxt = "/Humidity";
@@ -108,14 +116,10 @@ void startMQTT(WiFiClient wifiClient, PubSubClient mqttClient, char mqttUsername
       strcpy(farenheitTopic, tempF.c_str());
       strcpy(celsiusTopic, tempC.c_str());
       strcpy(humidityTopic, humid.c_str());
-      //Build data strings
-      dtostrf(currentTemperatureFarnehit, 4, 2, currentTemperatureFarnehitString);
-      dtostrf(currentTemperatureCelsius, 4, 2, currentTemperatureCelsiusString);
-      dtostrf(currentHumidity, 4, 2, currentHumidityString);
-      //Publish data to MQTT Broker
-      mqttClient.publish(farenheitTopic, currentTemperatureFarnehitString);
-      mqttClient.publish(celsiusTopic, currentTemperatureCelsiusString);
-      mqttClient.publish(humidityTopic, currentHumidityString);
+      //Publish to MQTT Broker
+      mqttClient.publish(farenheitTopic, currentTemperatureFarnehitString.c_str());
+      mqttClient.publish(celsiusTopic, currentTemperatureCelsiusString.c_str());
+      mqttClient.publish(humidityTopic, currentHumidityString.c_str());
       Serial.println("Published MQTT data"); 
       //TODO override sleepSeconds with data from this subscription if data is returned
       //mqttClient.subscribe("cycleTime");
