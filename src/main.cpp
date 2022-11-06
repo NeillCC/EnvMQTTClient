@@ -7,12 +7,12 @@
 //WiFi
 char wifiSSID[] = "iot7";                   //WiFi Name
 char wifiPassword[] = "aDayattherange69!";  //WiFi Password
-char wifiCustomHostname[] = "";  //Name to give dhcp server. This just needs be unique to your MQTT broker. Defaults to mac address
+char wifiCustomHostname[] = "officeTemp";  //Name to give dhcp server. This just needs be unique to your MQTT broker. Defaults to mac address
 bool useMacForHostname = true;              //Whether to use MAC Address as hostname. Must change to false for wifiCustomHostname to matter
 //MQTT Settings
 char mqttServer[] = "10.0.1.11";            //DNS or IP for MQTT Broker
 int  mqttPort = 2883;                       //Port for MQTT Broker. 1883 is standard
-std::string mqttPrefix = "";                //Prefix for MQTT name. Useful if you want to add homeassistant/
+std::string mqttPrefix = "homeassistant/sensor/";                //Prefix for MQTT name. Useful if you want to add homeassistant/
 //Power Settings
 //TODO sleepSeconds can be overriden by declaring a cycleTime topic on your MQTT Broker
 int sleepSeconds = 60;                       //How often to boot and update MQTT Broker. Higher number means less frequent updates, but better battery life. Default 60
@@ -29,9 +29,9 @@ int dhtPin = 4;                             //DHT connection pin
 float currentTemperatureFarnehit;
 float currentTemperatureCelsius;
 float currentHumidity;
-std::string currentTemperatureFarnehitString;
-std::string currentTemperatureCelsiusString;
-std::string currentHumidityString;
+char currentTemperatureFarnehitString[7];
+char currentTemperatureCelsiusString[7];
+char currentHumidityString[7];
 #pragma endregion
 void startSerial (int baudRate) {
   Serial.begin(baudRate);
@@ -84,9 +84,9 @@ void checkDHT(int dhtPin) {
   currentTemperatureFarnehit = dht.toFahrenheit(currentTemperatureCelsius);
   currentHumidity = dht.getHumidity();
   //Make string versions
-  currentTemperatureFarnehitString = std::to_string(currentTemperatureFarnehit);
-  currentTemperatureCelsiusString = std::to_string(currentTemperatureCelsius);
-  currentHumidityString = std::to_string(currentHumidity);
+  dtostrf(currentTemperatureFarnehit, 5, 2, currentTemperatureFarnehitString);
+  dtostrf(currentTemperatureCelsius, 5, 2, currentTemperatureCelsiusString);
+  dtostrf(currentHumidity, 5, 2, currentHumidityString);
   //Print temp results for debug
   Serial.print("Current Temperature F: ");
   Serial.println(currentTemperatureFarnehit);
@@ -102,6 +102,7 @@ void startMQTT(WiFiClient wifiClient, PubSubClient mqttClient, std::string hostn
   strcpy(wifiHostnameChar, hostname.c_str());
   mqttClient.setClient(wifiClient);
   mqttClient.setServer(mqttServer, mqttPort);
+  char blankChar[] = "/";
 
   //Try to connect 10 times
   int i = 0;
@@ -118,23 +119,23 @@ void startMQTT(WiFiClient wifiClient, PubSubClient mqttClient, std::string hostn
       Serial.print(mqttServer);
       Serial.println(" succesful!");
       //Build MQTT Topic char[]
-      std::string tempFTxt = "/Farenheit";
-      std::string tempCTxt = "/Celsius";
+      std::string tempFarenheitTxt = "/Farenheit";
+      std::string tempCelsiusText = "/Celsius";
       std::string humidTxt = "/HumidityPercent";
-      int l1 = hostname.length() + tempFTxt.length();
-      int l2 = hostname.length() + tempCTxt.length();
-      int l3 = hostname.length() + humidTxt.length();
+      int l1 = mqttPrefix.length() + hostname.length() + tempFarenheitTxt.length() + 1;
+      int l2 = mqttPrefix.length() + hostname.length() + tempCelsiusText.length() + 1;
+      int l3 = mqttPrefix.length() + hostname.length() + humidTxt.length() + 1;
       char farenheitTopic[l1 + 1];
       char celsiusTopic[l2 + 1];
       char humidityTopic[l3 + 1];
-      std::string tempF = mqttPrefix + wifiHostnameChar + tempFTxt;
-      std::string tempC = mqttPrefix + wifiHostnameChar + tempCTxt;
+      std::string tempFarenheit = mqttPrefix + wifiHostnameChar + tempFarenheitTxt;
+      std::string tempC = mqttPrefix + wifiHostnameChar + tempCelsiusText;
       std::string humid = mqttPrefix + wifiHostnameChar + humidTxt;
-      strcpy(farenheitTopic, tempF.c_str());
+      strcpy(farenheitTopic, tempFarenheit.c_str());
       strcpy(celsiusTopic, tempC.c_str());
       strcpy(humidityTopic, humid.c_str());
       //Publish to MQTT Broker
-      int lenF = currentTemperatureFarnehitString.length() + 1;
+      /* int lenF = currentTemperatureFarnehitString.length() + 1;
       int lenC = currentTemperatureCelsiusString.length() + 1;
       int lenH = currentHumidityString.length() + 1;
       char msgF[lenF];
@@ -142,10 +143,11 @@ void startMQTT(WiFiClient wifiClient, PubSubClient mqttClient, std::string hostn
       char msgH[lenH];
       strcpy(msgF, currentTemperatureFarnehitString.c_str());
       strcpy(msgC, currentTemperatureCelsiusString.c_str());
-      strcpy(msgH, currentHumidityString.c_str());
-      mqttClient.publish(farenheitTopic, msgF, retain);
-      mqttClient.publish(celsiusTopic, msgC, retain);
-      mqttClient.publish(humidityTopic, msgH, retain);
+      strcpy(msgH, currentHumidityString.c_str()); */
+      mqttClient.publish(farenheitTopic, currentTemperatureFarnehitString, retain);
+      mqttClient.publish(celsiusTopic, currentTemperatureCelsiusString, retain);
+      mqttClient.publish(humidityTopic, currentHumidityString, retain);
+      //Serial.println(.c_str());
       Serial.println("Published MQTT data"); 
       //TODO override sleepSeconds with data from this subscription if data is returned
       //mqttClient.subscribe("cycleTime");
